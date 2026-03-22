@@ -98,8 +98,10 @@ export const SELECTORS = {
     '#skills li.pvs-list__item--line-separated',
     '#skills li.artdeco-list__item',
     '#skills li.pvs-list__item--no-padding-in-columns',
+    '#skills li.pvs-list__pv-entry',
     // Older: sibling pattern
     '#skills ~ .pvs-list__outer-container li.pvs-list__item--line-separated',
+    '#skills ~ .pvs-list__outer-container li',
     '#skills ~ div li.pvs-list__item--line-separated',
   ],
 

@@ -295,7 +295,7 @@ function scrapeEducation(): LinkedInEducation[] {
 // ─── Skills ───────────────────────────────────────────────────────────────────
 
 // Patterns that are definitely not skill names
-const SKILL_NOISE = /endorsement|endorsed by|connections? have|people have|show all|skills$/i;
+const SKILL_NOISE = /^(endorsement|endorsed by|connections? have|people have|show all|skills|see more|see less|show more|show less)$/i;
 
 /** Extract skill name from a single skill list item — takes only the title span, not endorsement text */
 function extractSkillName(item: Element): string {
@@ -303,6 +303,8 @@ function extractSkillName(item: Element): string {
   const nameEl =
     item.querySelector<HTMLElement>('.t-bold span[aria-hidden="true"]') ??
     item.querySelector<HTMLElement>('.mr1 span[aria-hidden="true"]') ??
+    item.querySelector<HTMLElement>('.hoverable-link-text span[aria-hidden="true"]') ??
+    item.querySelector<HTMLElement>('.pvs-navigation__text span[aria-hidden="true"]') ??
     item.querySelector<HTMLElement>('span[aria-hidden="true"]'); // absolute fallback
 
   const t = nameEl?.textContent?.trim() ?? '';
@@ -311,40 +313,131 @@ function extractSkillName(item: Element): string {
   return t;
 }
 
+/**
+ * Find a section by looking for a heading element containing specific text.
+ * Useful as a fallback when the section has no anchor ID.
+ */
+function findSectionByHeading(headingText: string): Element | null {
+  // Look for h2/h3 elements with matching text, then walk up to the section/card
+  for (const tag of ['h2', 'h3']) {
+    for (const heading of document.querySelectorAll(tag)) {
+      const text = heading.textContent?.trim() ?? '';
+      if (text.toLowerCase() === headingText.toLowerCase()) {
+        // Walk up to the enclosing section or card container
+        const section = heading.closest('section, div.artdeco-card, div[data-view-name]');
+        if (section) {
+          console.debug(`[LI-Optimizer] found "${headingText}" section via <${tag}> heading`);
+          return section;
+        }
+      }
+    }
+  }
+  // Also check span-based headings (LinkedIn sometimes wraps heading text in spans)
+  for (const span of document.querySelectorAll<HTMLElement>('span.pvs-header__title, span.t-bold')) {
+    const text = span.textContent?.trim() ?? '';
+    if (text.toLowerCase() === headingText.toLowerCase()) {
+      const section = span.closest('section, div.artdeco-card, div[data-view-name]');
+      if (section) {
+        console.debug(`[LI-Optimizer] found "${headingText}" section via header span`);
+        return section;
+      }
+    }
+  }
+  return null;
+}
+
+/** Collect skills from a container element, pushing into results/seen */
+function collectSkillsFromContainer(
+  container: Element,
+  results: string[],
+  seen: Set<string>,
+  label: string
+): void {
+  // Try specific list item selectors first, then fall back to all li
+  const itemSelectors = [
+    'li.pvs-list__item--line-separated',
+    'li.artdeco-list__item',
+    'li.pvs-list__item--no-padding-in-columns',
+    'li.pvs-list__pv-entry',
+    'li',
+  ];
+
+  let items: NodeListOf<Element> | null = null;
+  for (const sel of itemSelectors) {
+    const found = container.querySelectorAll(sel);
+    if (found.length > 0) {
+      items = found;
+      console.debug(`[LI-Optimizer] ${label}: matched "${sel}" → ${found.length} items`);
+      break;
+    }
+  }
+
+  if (!items) return;
+
+  for (const item of items) {
+    if (results.length >= 50) break;
+    const skill = extractSkillName(item);
+    if (skill && !seen.has(skill)) {
+      seen.add(skill);
+      results.push(skill);
+    }
+  }
+}
+
 function scrapeSkills(): string[] {
   const seen = new Set<string>();
   const results: string[] = [];
 
-  // Strategy 1: find the skills section container and iterate list items
+  // Strategy 1: find the skills section container via #skills anchor
   const container = findSectionContainer('skills');
   if (container) {
-    const items = container.querySelectorAll('li');
-    console.debug('[LI-Optimizer] skills section items:', items.length);
-    for (const item of items) {
-      const skill = extractSkillName(item);
-      if (skill && !seen.has(skill)) {
-        seen.add(skill);
-        results.push(skill);
-      }
-      if (results.length >= 50) break;
+    console.debug('[LI-Optimizer] skills: found container via #skills anchor');
+    collectSkillsFromContainer(container, results, seen, 'skills-anchor');
+  }
+
+  // Strategy 2: find by heading text (for when #skills anchor is missing)
+  if (results.length === 0) {
+    const headingContainer = findSectionByHeading('Skills');
+    if (headingContainer) {
+      collectSkillsFromContainer(headingContainer, results, seen, 'skills-heading');
     }
   }
 
-  // Strategy 2: global selector fallback (targets specific list item class)
+  // Strategy 3: global selector fallback (targets specific list item class)
   if (results.length === 0) {
     const items = querySelectorAll([
       '#skills li.pvs-list__item--line-separated',
       '#skills li.artdeco-list__item',
       '#skills ~ div li.pvs-list__item--line-separated',
+      '#skills ~ .pvs-list__outer-container li',
+      'section:has(> div span.pvs-header__title) li.pvs-list__item--line-separated',
     ]);
-    console.debug('[LI-Optimizer] skills fallback items:', items.length);
+    console.debug('[LI-Optimizer] skills global fallback items:', items.length);
     for (const item of items) {
+      if (results.length >= 50) break;
       const skill = extractSkillName(item);
       if (skill && !seen.has(skill)) {
         seen.add(skill);
         results.push(skill);
       }
+    }
+  }
+
+  // Strategy 4: look for skill pill/badge elements (newer card-based layouts)
+  if (results.length === 0) {
+    const pills = document.querySelectorAll<HTMLElement>(
+      '[data-field="skill_card_skill_topic"] span[aria-hidden="true"], ' +
+      '.skill-card-skill-topic span[aria-hidden="true"], ' +
+      '.pv-skill-category-entity__name span[aria-hidden="true"]'
+    );
+    console.debug('[LI-Optimizer] skills pill fallback:', pills.length);
+    for (const pill of pills) {
       if (results.length >= 50) break;
+      const t = pill.textContent?.trim() ?? '';
+      if (t && t.length >= 2 && t.length <= 80 && !SKILL_NOISE.test(t) && !seen.has(t)) {
+        seen.add(t);
+        results.push(t);
+      }
     }
   }
 
