@@ -274,13 +274,29 @@ async function runPipeline(payload: StartOptimizationPayload): Promise<void> {
       );
     }
 
-    const profileData = scrapeRes.data;
+    let profileData = scrapeRes.data;
     await saveCachedProfile(profileData); // cache for next run
+
     const expCount = profileData.experience.length;
-    const profileSkillCount = profileData.skills.length;
     sendStep('scrape', 'Scrape LinkedIn profile', 'done',
-      `${expCount} experience${expCount !== 1 ? 's' : ''}, ${profileSkillCount} skills on profile`);
-    broadcast({ profileData });
+      `${expCount} experience${expCount !== 1 ? 's' : ''}, ${profileData.skills.length} skills on profile`);
+    broadcast({ profileData }); // broadcast immediately so UI shows headline/about
+
+    // Step 2b: augment skills from detail page (non-blocking for headline/about)
+    const detailSkills = await fetchSkillsFromDetailPage(profileData.profileUrl);
+    if (detailSkills.length > 0) {
+      const seen = new Set(profileData.skills.map(s => s.toLowerCase()));
+      const merged = [...profileData.skills];
+      for (const skill of detailSkills) {
+        if (!seen.has(skill.toLowerCase())) {
+          seen.add(skill.toLowerCase());
+          merged.push(skill);
+        }
+      }
+      profileData = { ...profileData, skills: merged };
+      await saveCachedProfile(profileData); // update cache with full skills
+      console.debug(`[SW] Skills merged: ${merged.length} total`);
+    }
 
     // ── Step 3: Gap Analysis ─────────────────────────────────────────────
     broadcast({ status: 'analyzing' });
@@ -351,6 +367,58 @@ async function getActiveLinkedInTab(): Promise<chrome.tabs.Tab | null> {
   // Fall back: any LinkedIn tab
   const allLinkedIn = await chrome.tabs.query({ url: 'https://www.linkedin.com/*' });
   return allLinkedIn[0] ?? null;
+}
+
+/** Resolves when tab reaches status "complete", rejects after timeoutMs. */
+function waitForTabLoad(tabId: number, timeoutMs = 15000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      reject(new Error(`Tab ${tabId} timed out`));
+    }, timeoutMs);
+
+    function listener(id: number, info: chrome.tabs.TabChangeInfo) {
+      if (id === tabId && info.status === 'complete') {
+        clearTimeout(timer);
+        chrome.tabs.onUpdated.removeListener(listener);
+        setTimeout(resolve, 800); // settle delay for SPA hydration
+      }
+    }
+    chrome.tabs.onUpdated.addListener(listener);
+
+    // Handle already-complete tab
+    chrome.tabs.get(tabId)
+      .then((tab) => {
+        if (tab.status === 'complete') {
+          clearTimeout(timer);
+          chrome.tabs.onUpdated.removeListener(listener);
+          setTimeout(resolve, 800);
+        }
+      })
+      .catch(() => { clearTimeout(timer); reject(new Error('Tab closed')); });
+  });
+}
+
+/** Opens skills detail page in background tab, scrapes all skills, closes tab. */
+async function fetchSkillsFromDetailPage(profileUrl: string): Promise<string[]> {
+  const base = profileUrl.endsWith('/') ? profileUrl : profileUrl + '/';
+  const skillsUrl = base + 'details/skills/';
+  let tabId: number | undefined;
+  try {
+    const tab = await chrome.tabs.create({ url: skillsUrl, active: false });
+    tabId = tab.id!;
+    console.debug('[SW] Skills detail tab:', tabId, skillsUrl);
+    await waitForTabLoad(tabId);
+    const res = await retryContentScript<string[]>(tabId, { action: 'SCRAPE_SKILLS_DETAIL' }, 3, 1000);
+    if (!res.success || !res.data) return [];
+    console.debug('[SW] Skills detail scraped:', res.data.length);
+    return res.data;
+  } catch (err) {
+    console.warn('[SW] fetchSkillsFromDetailPage failed:', err instanceof Error ? err.message : err);
+    return [];
+  } finally {
+    if (tabId !== undefined) chrome.tabs.remove(tabId).catch(() => {});
+  }
 }
 
 async function retryContentScript<T>(

@@ -105,6 +105,15 @@ export const SELECTORS = {
     '#skills ~ div li.pvs-list__item--line-separated',
   ],
 
+  // Skills detail page (/details/skills/) — no section anchor prefix needed
+  skillsDetailItems: [
+    'li.pvs-list__item--line-separated',
+    'li.artdeco-list__item',
+    'li.pvs-list__item--no-padding-in-columns',
+    'li.pvs-list__pv-entry',
+    'li',
+  ],
+
   // Edit buttons/modals
   editHeadlineBtn: [
     'button[aria-label*="Edit intro"]',

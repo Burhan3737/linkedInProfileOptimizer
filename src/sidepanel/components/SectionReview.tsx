@@ -107,21 +107,13 @@ export default function SectionReview({ session, onComplete, onReset }: Props) {
     if (!currentResult) return;
     await copyToClipboard(currentResult.optimized, sectionLabel(currentResult));
     await updateStatus(currentResult, 'approved');
-    advance();
   };
 
   const handleCopyEdited = async () => {
     if (!currentResult || !editedContent.trim()) return;
     await copyToClipboard(editedContent, sectionLabel(currentResult));
     await updateStatus(currentResult, 'edited', editedContent);
-    advance();
-  };
-
-  const handleSkip = async () => {
-    if (!currentResult) return;
-    console.log(`[Optimizer] Skipping "${sectionLabel(currentResult)}"`);
-    await updateStatus(currentResult, 'skipped');
-    advance();
+    setEditMode(false);
   };
 
   const handleStartEdit = () => {
@@ -322,26 +314,43 @@ export default function SectionReview({ session, onComplete, onReset }: Props) {
       {/* Action buttons */}
       <div className="border-t border-gray-200 p-3 flex flex-col gap-2">
         {editMode ? (
-          <div className="flex gap-2">
-            <button onClick={handleCopyEdited} className="btn-primary flex-1 text-xs">
-              {copied ? 'Copied!' : 'Copy & Done'}
-            </button>
-            <button onClick={handleCancelEdit} className="btn-secondary text-xs px-3">
-              Cancel
-            </button>
-          </div>
+          <>
+            <div className="flex gap-2">
+              <button onClick={handleCopyEdited} className="btn-primary flex-1 text-xs">
+                {copied ? 'Copied!' : 'Copy Edited'}
+              </button>
+              <button onClick={handleCancelEdit} className="btn-secondary text-xs px-3">
+                Cancel
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={goPrev} disabled={currentIndex === 0} className="btn-secondary flex-1 text-xs disabled:opacity-40">
+                ← Back
+              </button>
+              <button onClick={goNext} className="btn-secondary flex-1 text-xs">
+                Next →
+              </button>
+            </div>
+          </>
         ) : (
-          <div className="flex gap-2">
-            <button onClick={handleCopy} className="btn-primary flex-1 text-xs">
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-            <button onClick={handleStartEdit} className="btn-secondary text-xs px-3">
-              ✎ Edit
-            </button>
-            <button onClick={handleSkip} className="btn-danger text-xs px-3">
-              Skip
-            </button>
-          </div>
+          <>
+            <div className="flex gap-2">
+              <button onClick={handleCopy} className="btn-primary flex-1 text-xs">
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+              <button onClick={handleStartEdit} className="btn-secondary text-xs px-3">
+                ✎ Edit
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={goPrev} disabled={currentIndex === 0} className="btn-secondary flex-1 text-xs disabled:opacity-40">
+                ← Back
+              </button>
+              <button onClick={goNext} className="btn-secondary flex-1 text-xs">
+                Next →
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>

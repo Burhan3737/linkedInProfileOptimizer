@@ -1,5 +1,5 @@
 import type { ChromeMessage, ChromeResponse } from '../shared/messaging';
-import { scrapeFullProfile, checkSelectorHealth } from './scraper';
+import { scrapeFullProfile, checkSelectorHealth, scrapeSkillsDetailPage } from './scraper';
 import { safeApply, snapshotSection } from './injector';
 import type { OptimizationResult } from '../shared/types';
 import { saveUndoSnapshot } from '../shared/storage';
@@ -50,6 +50,12 @@ async function handleMessage(
         });
 
         sendResponse({ success: true, data: profile });
+        break;
+      }
+
+      case 'SCRAPE_SKILLS_DETAIL': {
+        const skills = scrapeSkillsDetailPage();
+        sendResponse({ success: true, data: skills });
         break;
       }
 

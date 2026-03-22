@@ -445,6 +445,18 @@ function scrapeSkills(): string[] {
   return results;
 }
 
+// ─── Skills detail page scrape (/details/skills/) ────────────────────────────
+
+export function scrapeSkillsDetailPage(): string[] {
+  if (!window.location.href.includes('/details/skills/')) return [];
+  console.debug('[LI-Optimizer] scrapeSkillsDetailPage START');
+  const seen = new Set<string>();
+  const results: string[] = [];
+  collectSkillsFromContainer(document.body, results, seen, 'skills-detail-page');
+  console.debug('[LI-Optimizer] scrapeSkillsDetailPage found:', results.length);
+  return results;
+}
+
 // ─── Full profile scrape ─────────────────────────────────────────────────────
 
 export function scrapeFullProfile(): CurrentProfileData | null {
