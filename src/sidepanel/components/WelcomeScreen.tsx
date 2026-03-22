@@ -156,89 +156,117 @@ export default function WelcomeScreen({ onStart, existingSession, onResume }: Pr
   const isSaved = !file && savedResume !== null;
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-5 animate-fade-in">
+      {/* Header */}
       <div>
-        <h1 className="text-lg font-semibold text-gray-900">Optimize Your LinkedIn</h1>
-        <p className="text-xs text-gray-500 mt-1">
-          Upload your resume, navigate to your LinkedIn profile, and let AI enhance each section.
+        <h1 className="text-lg font-bold text-neutral-900 tracking-tight">
+          Optimize Your Profile
+        </h1>
+        <p className="text-sm text-neutral-500 mt-1 leading-relaxed">
+          Upload your resume and let AI enhance each LinkedIn section.
         </p>
       </div>
 
       {/* Resume previous session banner */}
       {existingSession && onResume && (existingSession.status === 'reviewing' || existingSession.status === 'complete') && (
-        <div className="bg-linkedin-blue-light border border-linkedin-blue/30 rounded-lg p-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold text-linkedin-blue">
-              {existingSession.status === 'reviewing' ? '↩ Review in progress' : '✓ Previous session complete'}
-            </p>
-            <p className="text-xs text-gray-600 mt-0.5">
-              {existingSession.targetRole} · {existingSession.results.length} sections
-              {existingSession.status === 'reviewing' && ` · ${existingSession.results.filter(r => r.status === 'pending').length} pending`}
-            </p>
+        <div className="card !p-3.5 border-brand-100 bg-brand-50 animate-slide-up">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-brand-700">
+                {existingSession.status === 'reviewing' ? 'Review in progress' : 'Previous session complete'}
+              </p>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                {existingSession.targetRole} · {existingSession.results.length} sections
+                {existingSession.status === 'reviewing' && ` · ${existingSession.results.filter(r => r.status === 'pending').length} pending`}
+              </p>
+            </div>
+            <button type="button" onClick={onResume} className="btn-primary btn-sm shrink-0">
+              Resume
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
           </div>
-          <button type="button" onClick={onResume} className="btn-primary text-xs shrink-0 py-1.5">
-            Resume →
-          </button>
         </div>
       )}
 
       {/* File Upload */}
       <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-xs font-medium text-gray-700">Resume *</label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="input-label !mb-0">Resume</label>
           {isSaved && (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-neutral-400">
               Saved {formatRelativeTime(savedResume!.savedAt)}
             </span>
           )}
         </div>
 
         {activeFileName ? (
-          <div className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${
-            isSaved ? 'border-green-200 bg-green-50' : 'border-linkedin-blue bg-linkedin-blue-light'
+          <div className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${
+            isSaved
+              ? 'border-success-500/20 bg-success-50'
+              : 'border-brand-200 bg-brand-50'
           }`}>
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-base shrink-0">{isParsing ? '⟳' : isSaved ? '💾' : '📄'}</span>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                isParsing ? 'bg-neutral-100' : isSaved ? 'bg-success-100' : 'bg-brand-100'
+              }`}>
+                {isParsing ? (
+                  <div className="w-3.5 h-3.5 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isSaved ? '#16A34A' : '#1E3A5F'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                )}
+              </div>
               <div className="min-w-0">
-                <p className={`text-xs font-medium truncate ${isSaved ? 'text-green-800' : 'text-linkedin-blue'}`}>
+                <p className={`text-sm font-medium truncate ${isSaved ? 'text-success-700' : 'text-brand-700'}`}>
                   {activeFileName}
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-neutral-400">
                   {isParsing ? 'Extracting text...' : activeFileSize ? `${(activeFileSize / 1024).toFixed(0)} KB` : ''}
-                  {isSaved && ' · saved'}
+                  {isSaved && !isParsing && ' · saved'}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0 ml-2">
+            <div className="flex items-center gap-1 shrink-0 ml-3">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-xs text-gray-500 hover:text-gray-700 underline"
+                className="btn-ghost btn-sm !text-xs !px-2"
               >
                 Change
               </button>
               <button
                 type="button"
                 onClick={handleClearResume}
-                className="text-xs text-red-400 hover:text-red-600"
+                className="btn-ghost btn-sm !px-1.5 !text-neutral-400 hover:!text-danger-600"
                 title="Remove"
               >
-                ✕
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
           </div>
         ) : (
           <div
-            className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors
-              ${isDragging ? 'border-linkedin-blue bg-linkedin-blue-light' : 'border-gray-300 hover:border-gray-400'}`}
+            className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-150
+              ${isDragging
+                ? 'border-brand-700 bg-brand-50'
+                : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+              }`}
             onDrop={handleDrop}
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
             onClick={() => fileInputRef.current?.click()}
           >
-            <div className="text-xs text-gray-500">
-              <p className="font-medium">Drop your resume here</p>
-              <p className="text-gray-400">PDF, DOCX, or TXT</p>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-neutral-100 flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#737370" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-neutral-700">Drop your resume here</p>
+                <p className="text-xs text-neutral-400 mt-0.5">PDF, DOCX, or TXT</p>
+              </div>
             </div>
           </div>
         )}
@@ -254,24 +282,31 @@ export default function WelcomeScreen({ onStart, existingSession, onResume }: Pr
 
       {/* Mode */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">Optimization Mode</label>
-        <div className="grid grid-cols-2 gap-2">
+        <label className="input-label">Optimization Mode</label>
+        <div className="grid grid-cols-2 gap-2.5">
           {([
-            { value: 'job_seeker', label: 'Job Seeker', desc: 'Aggressive keyword optimization' },
-            { value: 'visibility', label: 'Visibility', desc: 'Broad recruiter discovery' },
+            { value: 'job_seeker', label: 'Job Seeker', desc: 'Aggressive keyword optimization', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
+            { value: 'visibility', label: 'Visibility', desc: 'Broad recruiter discovery', icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' },
           ] as const).map((m) => (
             <button
               key={m.value}
               type="button"
               onClick={() => setMode(m.value)}
-              className={`p-2 rounded-md border text-left transition-colors ${
+              className={`p-3.5 rounded-xl border text-left transition-all duration-150 ${
                 mode === m.value
-                  ? 'border-linkedin-blue bg-linkedin-blue-light text-linkedin-blue'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-brand-700 bg-brand-50 ring-1 ring-brand-700/10'
+                  : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
               }`}
             >
-              <div className="font-medium text-xs">{m.label}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{m.desc}</div>
+              <div className="flex items-center gap-2 mb-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={mode === m.value ? '#1E3A5F' : '#A3A3A0'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={m.icon}/>
+                </svg>
+                <span className={`font-semibold text-sm ${mode === m.value ? 'text-brand-700' : 'text-neutral-700'}`}>
+                  {m.label}
+                </span>
+              </div>
+              <div className="text-xs text-neutral-500 leading-relaxed">{m.desc}</div>
             </button>
           ))}
         </div>
@@ -279,10 +314,10 @@ export default function WelcomeScreen({ onStart, existingSession, onResume }: Pr
 
       {/* Target Role */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">Target Role *</label>
+        <label className="input-label">Target Role</label>
         <input
           type="text"
-          className="input-field text-sm"
+          className="input-field"
           placeholder="e.g. Senior Product Manager"
           value={targetRole}
           onChange={(e) => setTargetRole(e.target.value)}
@@ -291,11 +326,11 @@ export default function WelcomeScreen({ onStart, existingSession, onResume }: Pr
 
       {/* Job Description */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
-          Job Description <span className="text-gray-400">(optional)</span>
+        <label className="input-label">
+          Job Description <span className="text-neutral-400 font-normal">(optional)</span>
         </label>
         <textarea
-          className="input-field text-xs resize-none"
+          className="input-field resize-none"
           rows={4}
           placeholder="Paste the job description for more targeted optimization..."
           value={jobDescription}
@@ -304,17 +339,34 @@ export default function WelcomeScreen({ onStart, existingSession, onResume }: Pr
       </div>
 
       {error && (
-        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
+        <div className="alert-error text-xs animate-slide-up">
           {error}
         </div>
       )}
 
-      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-        Navigate to your <strong>LinkedIn profile page</strong> (linkedin.com/in/…) before clicking Analyze.
+      <div className="alert-warning text-xs">
+        <div className="flex items-start gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>Navigate to your <strong>LinkedIn profile page</strong> (linkedin.com/in/...) before clicking Analyze.</span>
+        </div>
       </div>
 
       <button type="submit" className="btn-primary w-full" disabled={isLoading || isParsing}>
-        {isLoading ? 'Starting...' : isParsing ? 'Reading file...' : 'Analyze My Profile'}
+        {isLoading ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            Starting...
+          </>
+        ) : isParsing ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            Reading file...
+          </>
+        ) : (
+          'Analyze My Profile'
+        )}
       </button>
     </form>
   );

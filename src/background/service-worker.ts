@@ -6,7 +6,7 @@ import type {
 
 import type { StartOptimizationPayload, UpdateResultStatusPayload } from '../shared/messaging';
 import { broadcastToSidePanel, sendToContentScript } from '../shared/messaging';
-import { getSession, saveSession, clearSession, getSettings, saveSettings, saveCachedProfile, getCachedProfile } from '../shared/storage';
+import { getSession, saveSession, clearSession, getSettings, saveSettings, saveCachedProfile, getCachedProfile, clearCachedProfile } from '../shared/storage';
 import { getAvailableProvider } from '../ai/index';
 import { structureResumeText } from '../parsers/resume-parser';
 import { runGapAnalysis } from '../optimizer/gap-analysis';
@@ -113,6 +113,7 @@ async function handleMessage(
 
       case 'RESET_SESSION': {
         await clearSession();
+        await clearCachedProfile();
         sendResponse({ success: true });
         break;
       }

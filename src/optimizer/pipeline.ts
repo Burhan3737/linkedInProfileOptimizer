@@ -57,6 +57,8 @@ export async function runOptimizationPipeline(
           results.push({
             section,
             sectionId: exp.id,
+            displayTitle: exp.title,
+            displaySubtitle: exp.company,
             original: exp.description,
             optimized: output.optimized,
             reasoning: warnings.length > 0
@@ -73,6 +75,8 @@ export async function runOptimizationPipeline(
           results.push({
             section,
             sectionId: exp.id,
+            displayTitle: exp.title,
+            displaySubtitle: exp.company,
             original: exp.description,
             optimized: exp.description,
             reasoning: `Error: ${error}`,

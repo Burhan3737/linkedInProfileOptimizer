@@ -49,6 +49,8 @@ export const SELECTORS = {
     // Older: sibling after anchor
     '#experience ~ .pvs-list__outer-container li.pvs-list__item--line-separated',
     '#experience ~ div li.pvs-list__item--line-separated',
+    // data-view-name based (newer LinkedIn builds)
+    '[data-view-name="profile-component-entity"] li.pvs-list__item--line-separated',
     // Legacy
     '.experience-section .pv-position-entity',
   ],

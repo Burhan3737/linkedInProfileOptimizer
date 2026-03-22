@@ -86,6 +86,8 @@ export type OptimizationMode = 'job_seeker' | 'visibility';
 export interface OptimizationResult {
   section: LinkedInSection;
   sectionId?: string; // for experience/education items
+  displayTitle?: string; // e.g. "Software Engineer"
+  displaySubtitle?: string; // e.g. "Google"
   original: string;
   optimized: string;
   reasoning: string;

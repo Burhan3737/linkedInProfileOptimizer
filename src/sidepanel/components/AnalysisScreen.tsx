@@ -79,11 +79,11 @@ export default function AnalysisScreen({ session, onReset }: Props) {
 
       // Feed into log
       if (step.status === 'running') {
-        addLog(`⟳ ${step.label}${step.detail ? ` — ${step.detail}` : ''}`, 'info');
+        addLog(`${step.label}${step.detail ? ` — ${step.detail}` : ''}`, 'info');
       } else if (step.status === 'done') {
-        addLog(`✓ ${step.label}`, 'success');
+        addLog(`${step.label}`, 'success');
       } else if (step.status === 'error') {
-        addLog(`✕ ${step.label}${step.detail ? `: ${step.detail}` : ''}`, 'error');
+        addLog(`${step.label}${step.detail ? `: ${step.detail}` : ''}`, 'error');
       }
     };
 
@@ -98,12 +98,12 @@ export default function AnalysisScreen({ session, onReset }: Props) {
     prevStatusRef.current = session.status;
 
     const msgs: Record<string, string> = {
-      parsing:    '⟳ Sending resume text to AI for structured extraction...',
-      scraping:   '⟳ Injecting content script into LinkedIn tab...',
-      analyzing:  '⟳ Comparing resume against LinkedIn profile...',
-      optimizing: '⟳ Starting section-by-section AI optimization...',
-      reviewing:  '✓ All sections optimized — ready for your review',
-      error:      `✕ Error: ${session.error ?? 'unknown'}`,
+      parsing:    'Sending resume text to AI for structured extraction...',
+      scraping:   'Injecting content script into LinkedIn tab...',
+      analyzing:  'Comparing resume against LinkedIn profile...',
+      optimizing: 'Starting section-by-section AI optimization...',
+      reviewing:  'All sections optimized — ready for your review',
+      error:      `Error: ${session.error ?? 'unknown'}`,
     };
 
     if (msgs[session.status]) {
@@ -145,15 +145,15 @@ export default function AnalysisScreen({ session, onReset }: Props) {
   const totalSections = sectionSteps.length;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden animate-fade-in">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+      <div className="px-5 pt-5 pb-4 border-b border-neutral-100">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">
-            {isError ? 'Error' : isDone ? 'Ready for review' : 'Analyzing profile...'}
+          <h2 className="font-bold text-neutral-900 tracking-tight">
+            {isError ? 'Something went wrong' : isDone ? 'Ready for review' : 'Analyzing profile'}
           </h2>
           {!isDone && !isError && (
-            <span className="text-xs text-gray-400 tabular-nums">
+            <span className="text-xs text-neutral-400 tabular-nums font-medium bg-neutral-100 px-2.5 py-1 rounded-full">
               {formatElapsed(elapsed)}
             </span>
           )}
@@ -161,27 +161,25 @@ export default function AnalysisScreen({ session, onReset }: Props) {
 
         {/* Top-level progress bar */}
         {!isError && (
-          <div className="mt-2">
-            <div className="flex gap-1">
-              {topSteps.map((step) => (
-                <div
-                  key={step.id}
-                  className={`h-1 flex-1 rounded-full transition-all duration-500 ${
-                    step.status === 'done' ? 'bg-green-400' :
-                    step.status === 'running' ? 'bg-linkedin-blue animate-pulse' :
-                    step.status === 'error' ? 'bg-red-400' :
-                    'bg-gray-200'
-                  }`}
-                />
-              ))}
-            </div>
+          <div className="mt-3 flex gap-1.5">
+            {topSteps.map((step) => (
+              <div
+                key={step.id}
+                className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                  step.status === 'done' ? 'bg-success-500' :
+                  step.status === 'running' ? 'bg-brand-700 animate-pulse-subtle' :
+                  step.status === 'error' ? 'bg-danger-500' :
+                  'bg-neutral-200'
+                }`}
+              />
+            ))}
           </div>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
         {/* Main steps */}
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1">
           {topSteps.map((step) => (
             <StepRow key={step.id} label={step.label} status={step.status} />
           ))}
@@ -189,27 +187,27 @@ export default function AnalysisScreen({ session, onReset }: Props) {
 
         {/* Section sub-steps during optimization */}
         {sectionSteps.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium text-gray-600">Sections</span>
-              <span className="text-xs text-gray-400">
+          <div className="animate-slide-up">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-neutral-600">Sections</span>
+              <span className="text-xs text-neutral-400 font-medium">
                 {completedSections}/{totalSections}
               </span>
             </div>
-            <div className="flex flex-col gap-1 pl-3 border-l-2 border-gray-100">
+            <div className="flex flex-col gap-0.5 pl-3 border-l-2 border-neutral-200">
               {sectionSteps.map((step) => (
-                <div key={step.id} className="flex items-center gap-2">
+                <div key={step.id} className="flex items-center gap-2.5 py-1">
                   <MiniIcon status={step.status} />
                   <span className={`text-xs truncate ${
-                    step.status === 'running' ? 'text-linkedin-blue font-medium' :
-                    step.status === 'done' ? 'text-gray-500' :
-                    step.status === 'error' ? 'text-red-500' :
-                    'text-gray-400'
+                    step.status === 'running' ? 'text-brand-700 font-medium' :
+                    step.status === 'done' ? 'text-neutral-400' :
+                    step.status === 'error' ? 'text-danger-600' :
+                    'text-neutral-400'
                   }`}>
                     {step.label.replace('Optimizing ', '')}
                   </span>
-                  {step.status === 'running' && (
-                    <span className="text-xs text-gray-400 italic truncate">{step.detail}</span>
+                  {step.status === 'running' && step.detail && (
+                    <span className="text-xs text-neutral-400 truncate">{step.detail}</span>
                   )}
                 </div>
               ))}
@@ -219,11 +217,11 @@ export default function AnalysisScreen({ session, onReset }: Props) {
 
         {/* Error */}
         {isError && session?.error && (
-          <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-3">
-            <p className="font-semibold mb-1">Error</p>
+          <div className="alert-error text-xs animate-slide-up">
+            <p className="font-semibold mb-1.5">Error</p>
             <p className="whitespace-pre-wrap leading-relaxed">{session.error}</p>
             <button
-              className="mt-2 text-xs text-red-500 underline"
+              className="mt-2 text-xs text-danger-600 hover:text-danger-700 underline underline-offset-2 transition-colors"
               onClick={() => navigator.clipboard.writeText(session.error ?? '')}
             >
               Copy error text
@@ -234,21 +232,30 @@ export default function AnalysisScreen({ session, onReset }: Props) {
         {/* Live log */}
         {log.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-gray-500 mb-1">Activity</div>
-            <div className="bg-gray-50 border border-gray-100 rounded p-2 max-h-44 overflow-y-auto font-mono">
+            <div className="text-xs font-semibold text-neutral-500 mb-2">Activity</div>
+            <div className="card-muted !p-3 max-h-44 overflow-y-auto font-mono">
               {log.map((entry) => (
                 <div
                   key={entry.id}
-                  className={`text-xs leading-5 ${
-                    entry.type === 'success' ? 'text-green-700' :
-                    entry.type === 'error' ? 'text-red-600' :
-                    'text-gray-600'
+                  className={`text-xs leading-6 flex gap-2 ${
+                    entry.type === 'success' ? 'text-success-700' :
+                    entry.type === 'error' ? 'text-danger-600' :
+                    'text-neutral-500'
                   }`}
                 >
-                  <span className="text-gray-300 mr-1.5 select-none">
+                  <span className="text-neutral-300 select-none shrink-0 tabular-nums">
                     {formatTs(entry.ts)}
                   </span>
-                  {entry.text}
+                  <span className="shrink-0">
+                    {entry.type === 'success' ? (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    ) : entry.type === 'error' ? (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    ) : (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline -mt-0.5"><polyline points="9 18 15 12 9 6"/></svg>
+                    )}
+                  </span>
+                  <span>{entry.text}</span>
                 </div>
               ))}
               <div ref={logEndRef} />
@@ -257,15 +264,18 @@ export default function AnalysisScreen({ session, onReset }: Props) {
         )}
 
         {isDone && (
-          <div className="text-xs text-green-700 bg-green-50 border border-green-200 rounded p-3 text-center font-medium">
-            ✓ Optimization complete — switching to review...
+          <div className="alert-success text-sm text-center font-medium animate-slide-up">
+            <div className="flex items-center justify-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Optimization complete — switching to review
+            </div>
           </div>
         )}
       </div>
 
       {isError && (
-        <div className="border-t border-gray-200 p-3">
-          <button onClick={onReset} className="btn-secondary text-xs w-full">
+        <div className="border-t border-neutral-200 p-4 bg-white">
+          <button onClick={onReset} className="btn-secondary w-full">
             Start Over
           </button>
         </div>
@@ -276,49 +286,54 @@ export default function AnalysisScreen({ session, onReset }: Props) {
 
 function StepRow({ label, status }: { label: string; status: LiveStep['status'] }) {
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex items-center gap-3 py-1.5">
       <StepIcon status={status} />
-      <span className={`text-xs font-medium ${
-        status === 'running' ? 'text-gray-900' :
-        status === 'done' ? 'text-gray-400' :
-        status === 'error' ? 'text-red-600' :
-        'text-gray-400'
+      <span className={`text-sm font-medium ${
+        status === 'running' ? 'text-neutral-900' :
+        status === 'done' ? 'text-neutral-400' :
+        status === 'error' ? 'text-danger-600' :
+        'text-neutral-300'
       }`}>
         {label}
       </span>
       {status === 'running' && (
-        <span className="text-xs text-gray-400 italic">working...</span>
+        <span className="text-xs text-neutral-400">working...</span>
       )}
     </div>
   );
 }
 
 function StepIcon({ status }: { status: LiveStep['status'] }) {
-  const base = 'w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs';
-  if (status === 'done')    return <div className={`${base} bg-green-100 text-green-600`}>✓</div>;
-  if (status === 'running') return <div className={`${base} bg-linkedin-blue-light`}><Spinner /></div>;
-  if (status === 'error')   return <div className={`${base} bg-red-100 text-red-500`}>✕</div>;
-  return <div className={`${base} bg-gray-100 text-gray-300`}>·</div>;
+  const base = 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-200';
+  if (status === 'done') return (
+    <div className={`${base} bg-success-50 text-success-600`}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+  );
+  if (status === 'running') return (
+    <div className={`${base} bg-brand-50`}>
+      <div className="w-3 h-3 border-2 border-brand-200 border-t-brand-700 rounded-full animate-spin" />
+    </div>
+  );
+  if (status === 'error') return (
+    <div className={`${base} bg-danger-50 text-danger-500`}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </div>
+  );
+  return <div className={`${base} bg-neutral-100`}><div className="w-1.5 h-1.5 rounded-full bg-neutral-300" /></div>;
 }
 
 function MiniIcon({ status }: { status: LiveStep['status'] }) {
-  if (status === 'done')    return <span className="text-green-500 text-xs shrink-0">✓</span>;
-  if (status === 'running') return <Spinner className="text-linkedin-blue shrink-0" />;
-  if (status === 'error')   return <span className="text-red-400 text-xs shrink-0">✕</span>;
-  return <span className="text-gray-300 text-xs shrink-0">·</span>;
-}
-
-function Spinner({ className = 'text-linkedin-blue' }: { className?: string }) {
-  return (
-    <svg
-      className={`w-3 h-3 animate-spin ${className}`}
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-    </svg>
+  if (status === 'done') return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
   );
+  if (status === 'running') return (
+    <div className="w-3 h-3 border-2 border-brand-200 border-t-brand-700 rounded-full animate-spin shrink-0" />
+  );
+  if (status === 'error') return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  );
+  return <div className="w-1.5 h-1.5 rounded-full bg-neutral-300 shrink-0" />;
 }
 
 function formatElapsed(s: number): string {

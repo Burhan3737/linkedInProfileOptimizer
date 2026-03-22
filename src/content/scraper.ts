@@ -67,8 +67,11 @@ function findSectionContainer(anchorId: string): Element | null {
   if (!anchor) return null;
 
   // Case (b): anchor IS the section/div with real content
-  if (anchor.querySelector('span[aria-hidden="true"]') ||
-      anchor.querySelector('li')) {
+  // Require li items — a bare anchor with only a heading span is not a real container
+  if (anchor.querySelector('li')) {
+    return anchor;
+  }
+  if (anchor.querySelector('span[aria-hidden="true"]') && anchor.tagName === 'SECTION') {
     return anchor;
   }
 
@@ -215,13 +218,12 @@ function scrapeExperience(): LinkedInExperience[] {
   const results: LinkedInExperience[] = [];
 
   // Find the experience section container
-  const container = findSectionContainer('experience');
+  let container = findSectionContainer('experience');
   console.debug('[LI-Optimizer] experience container:', container?.tagName, container?.id);
 
   // Get all top-level list items from the container
   let items: Element[] = [];
   if (container) {
-    // Try direct list items first
     items = Array.from(container.querySelectorAll('li.pvs-list__item--line-separated, li.artdeco-list__item'));
     console.debug('[LI-Optimizer] experience items (container):', items.length);
   }
@@ -230,6 +232,32 @@ function scrapeExperience(): LinkedInExperience[] {
   if (items.length === 0) {
     items = querySelectorAll(SELECTORS.experienceItems);
     console.debug('[LI-Optimizer] experience items (global selectors):', items.length);
+  }
+
+  // Heading-based fallback — handles cases where #experience is a bare anchor
+  // div and the real content is in a separate <section> with no id
+  if (items.length === 0) {
+    const headingContainer = findSectionByHeading('Experience');
+    if (headingContainer) {
+      container = headingContainer;
+      items = Array.from(headingContainer.querySelectorAll(
+        'li.pvs-list__item--line-separated, li.artdeco-list__item, li.pvs-list__item--no-padding'
+      ));
+      console.debug('[LI-Optimizer] experience items (heading fallback):', items.length);
+    }
+  }
+
+  // Broadest fallback: any <section> whose h2 mentions "Experience"
+  if (items.length === 0) {
+    for (const section of document.querySelectorAll('section')) {
+      const heading = section.querySelector('h2, h3');
+      const text = heading?.textContent?.trim().toLowerCase() ?? '';
+      if (text === 'experience' || text === 'experienceexperience') {
+        items = Array.from(section.querySelectorAll('li'));
+        console.debug('[LI-Optimizer] experience items (section-heading broadest):', items.length);
+        if (items.length > 0) break;
+      }
+    }
   }
 
   for (const item of items.slice(0, 10)) {
@@ -319,10 +347,12 @@ function extractSkillName(item: Element): string {
  */
 function findSectionByHeading(headingText: string): Element | null {
   // Look for h2/h3 elements with matching text, then walk up to the section/card
+  // Note: LinkedIn doubles heading text (visible + sr-only), so use includes()
+  const needle = headingText.toLowerCase();
   for (const tag of ['h2', 'h3']) {
     for (const heading of document.querySelectorAll(tag)) {
-      const text = heading.textContent?.trim() ?? '';
-      if (text.toLowerCase() === headingText.toLowerCase()) {
+      const text = heading.textContent?.trim().toLowerCase() ?? '';
+      if (text === needle || text === needle + needle) {
         // Walk up to the enclosing section or card container
         const section = heading.closest('section, div.artdeco-card, div[data-view-name]');
         if (section) {
@@ -334,8 +364,8 @@ function findSectionByHeading(headingText: string): Element | null {
   }
   // Also check span-based headings (LinkedIn sometimes wraps heading text in spans)
   for (const span of document.querySelectorAll<HTMLElement>('span.pvs-header__title, span.t-bold')) {
-    const text = span.textContent?.trim() ?? '';
-    if (text.toLowerCase() === headingText.toLowerCase()) {
+    const text = span.textContent?.trim().toLowerCase() ?? '';
+    if (text === needle || text === needle + needle) {
       const section = span.closest('section, div.artdeco-card, div[data-view-name]');
       if (section) {
         console.debug(`[LI-Optimizer] found "${headingText}" section via header span`);

@@ -34,3 +34,4 @@ Thumbs.db
 *.tsbuildinfo
 
 context/sessions
+.playwright-auth
