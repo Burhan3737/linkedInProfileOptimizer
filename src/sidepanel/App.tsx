@@ -101,7 +101,7 @@ export default function App() {
         ) : screen === 'analysis' ? (
           <AnalysisScreen session={session} onReset={handleReset} />
         ) : screen === 'review' ? (
-          <SectionReview session={session!} onComplete={() => setScreen('summary')} onReset={handleReset} />
+          <SectionReview session={session!} onComplete={async () => { await sendToServiceWorker({ action: 'COMPLETE_REVIEW' }); setScreen('summary'); }} onReset={handleReset} />
         ) : screen === 'summary' ? (
           <SummaryScreen session={session} onReset={handleReset} />
         ) : null}

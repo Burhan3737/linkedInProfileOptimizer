@@ -15,6 +15,7 @@ export type MessageAction =
   | 'APPLY_CHANGE'
   | 'GET_SESSION'
   | 'UPDATE_RESULT_STATUS'
+  | 'COMPLETE_REVIEW'
   | 'RESET_SESSION'
   | 'GET_SETTINGS'
   | 'SAVE_SETTINGS'

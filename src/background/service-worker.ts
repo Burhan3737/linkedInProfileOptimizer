@@ -95,11 +95,18 @@ async function handleMessage(
           }
         }
 
-        const allReviewed = session.results.every((r) => r.status !== 'pending');
-        if (allReviewed) session.status = 'complete';
-
         await saveSession(session);
         broadcastToSidePanel({ action: 'SESSION_UPDATE', payload: session });
+        sendResponse({ success: true });
+        break;
+      }
+
+      case 'COMPLETE_REVIEW': {
+        const session = await getSession();
+        if (session) {
+          session.status = 'complete';
+          await saveSession(session);
+        }
         sendResponse({ success: true });
         break;
       }

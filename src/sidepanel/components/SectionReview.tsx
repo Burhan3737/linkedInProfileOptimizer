@@ -327,8 +327,8 @@ export default function SectionReview({ session, onComplete, onReset }: Props) {
               <button onClick={goPrev} disabled={currentIndex === 0} className="btn-secondary flex-1 text-xs disabled:opacity-40">
                 ← Back
               </button>
-              <button onClick={goNext} className="btn-secondary flex-1 text-xs">
-                Next →
+              <button onClick={currentIndex === total - 1 ? onComplete : goNext} className="btn-secondary flex-1 text-xs">
+                {currentIndex === total - 1 ? 'Finish →' : 'Next →'}
               </button>
             </div>
           </>
@@ -346,8 +346,8 @@ export default function SectionReview({ session, onComplete, onReset }: Props) {
               <button onClick={goPrev} disabled={currentIndex === 0} className="btn-secondary flex-1 text-xs disabled:opacity-40">
                 ← Back
               </button>
-              <button onClick={goNext} className="btn-secondary flex-1 text-xs">
-                Next →
+              <button onClick={currentIndex === total - 1 ? onComplete : goNext} className="btn-secondary flex-1 text-xs">
+                {currentIndex === total - 1 ? 'Finish →' : 'Next →'}
               </button>
             </div>
           </>
