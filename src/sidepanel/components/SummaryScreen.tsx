@@ -93,7 +93,6 @@ export default function SummaryScreen({ session, onReset }: Props) {
           target="_blank"
           rel="noreferrer"
           className="btn-primary text-center text-xs no-underline"
-          onClick={() => chrome.tabs.create({ url: session.profileData!.profileUrl })}
         >
           View Your LinkedIn Profile →
         </a>
