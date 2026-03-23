@@ -346,7 +346,7 @@ async function runPipeline(payload: StartOptimizationPayload): Promise<void> {
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     broadcast({ status: 'error', error });
-    console.error('[SW] Pipeline failed:', error);
+    console.error('[SW] Pipeline failed:', err);
   }
 }
 
@@ -376,7 +376,7 @@ function waitForTabLoad(tabId: number, timeoutMs = 15000): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
-      reject(new Error(`Tab ${tabId} timed out`));
+      reject(new Error('LinkedIn page took too long to load. Check your internet connection and try again.'));
     }, timeoutMs);
 
     function listener(id: number, info: chrome.tabs.TabChangeInfo) {
@@ -397,7 +397,7 @@ function waitForTabLoad(tabId: number, timeoutMs = 15000): Promise<void> {
           setTimeout(resolve, 800);
         }
       })
-      .catch(() => { clearTimeout(timer); reject(new Error('Tab closed')); });
+      .catch(() => { clearTimeout(timer); reject(new Error('The LinkedIn tab was closed before scraping could complete. Keep the tab open and try again.')); });
   });
 }
 
@@ -480,7 +480,7 @@ async function retryContentScript<T>(
         } else {
           return {
             success: false,
-            error: 'Content script not ready. The LinkedIn page may still be loading — please wait for it to fully load and try again.',
+            error: 'Could not connect to the LinkedIn page after multiple attempts. Reload the LinkedIn profile tab and try again.',
           };
         }
       } else {
@@ -488,5 +488,5 @@ async function retryContentScript<T>(
       }
     }
   }
-  return { success: false, error: 'All retry attempts failed' };
+  return { success: false, error: 'Could not read the LinkedIn page after multiple attempts. Reload the LinkedIn profile tab and try again.' };
 }

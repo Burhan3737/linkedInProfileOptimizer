@@ -76,19 +76,22 @@ export function parseOptimizationResponse(rawResponse: string): OptimizationOutp
   // Try to extract JSON if there's surrounding text
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error(`No JSON found in AI response: ${cleaned.slice(0, 200)}`);
+    console.error('[Validator] No JSON found in AI response. Preview:', cleaned.slice(0, 500));
+    throw new Error('AI returned an unexpected response for this section — it will be skipped. Try again or switch to a different model in Settings.');
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonMatch[0]);
   } catch (e) {
-    throw new Error(`Invalid JSON in AI response: ${jsonMatch[0].slice(0, 200)}`);
+    console.error('[Validator] JSON parse error:', e, '| raw:', jsonMatch[0].slice(0, 300));
+    throw new Error('Could not parse the AI response for this section — it will be skipped. Try again or switch to a different model in Settings.');
   }
 
   const result = OptimizationOutputSchema.safeParse(parsed);
   if (!result.success) {
-    throw new Error(`Schema validation failed: ${result.error.message}`);
+    console.error('[Validator] Schema validation failed:', result.error.message, '| parsed:', parsed);
+    throw new Error('AI response did not match the expected structure for this section — it will be skipped.');
   }
 
   return result.data;

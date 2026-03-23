@@ -49,12 +49,27 @@ export async function extractTextFromFile(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
 
   if (ext === 'pdf') {
-    return extractTextFromPDF(buffer);
+    try {
+      return await extractTextFromPDF(buffer);
+    } catch (err) {
+      console.error('[ResumeParser] PDF extraction failed:', err);
+      throw new Error('Could not extract text from your PDF. Make sure it is not a scanned or image-only PDF — try re-saving as a text-based PDF, or convert it to DOCX or TXT.');
+    }
   } else if (ext === 'docx' || ext === 'doc') {
-    return extractTextFromDOCX(buffer);
+    try {
+      return await extractTextFromDOCX(buffer);
+    } catch (err) {
+      console.error('[ResumeParser] DOCX extraction failed:', err);
+      throw new Error('Could not read your DOCX file. Try saving it as a PDF or plain text (.txt) file.');
+    }
   } else {
     // Plain text / txt
-    return new TextDecoder().decode(buffer);
+    try {
+      return new TextDecoder().decode(buffer);
+    } catch (err) {
+      console.error('[ResumeParser] Text decode failed:', err);
+      throw new Error('Could not read the text file. Make sure it is a valid UTF-8 encoded .txt file.');
+    }
   }
 }
 
@@ -152,24 +167,27 @@ export async function structureResumeText(rawText: string, provider: AIProvider)
   }
 
   if (!jsonStr) {
-    throw new Error(`Resume parser: AI returned no JSON. Response preview: "${cleaned.slice(0, 200)}"`);
+    console.error('[ResumeParser] No JSON in AI response. Preview:', cleaned.slice(0, 500));
+    throw new Error('Resume parsing failed — the AI returned an unexpected response. Try again or switch to a different model in Settings.');
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonStr);
-  } catch {
+  } catch (parseErr) {
     // Last-ditch: try the repair on whatever we matched
     try {
       parsed = JSON.parse(repairTruncatedJson(jsonStr));
-    } catch {
-      throw new Error(`Resume parser: Could not parse AI response as JSON. Try a different model. Preview: "${jsonStr.slice(0, 200)}"`);
+    } catch (repairErr) {
+      console.error('[ResumeParser] JSON parse failed:', parseErr, '| repair attempt also failed:', repairErr, '| raw:', jsonStr.slice(0, 500));
+      throw new Error('Resume parsing failed — the AI response was malformed. Try again or switch to a different model in Settings.');
     }
   }
 
   const result = ResumeDataSchema.safeParse(parsed);
   if (!result.success) {
-    throw new Error(`Resume parser: Schema validation failed: ${result.error.message}`);
+    console.error('[ResumeParser] Schema validation failed:', result.error.message, '| parsed object:', parsed);
+    throw new Error('Resume parsing failed — your resume had an unexpected structure. Try a simpler format or switch to a different model in Settings.');
   }
 
   return { ...result.data, rawText };

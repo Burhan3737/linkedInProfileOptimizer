@@ -58,7 +58,7 @@ export default function WelcomeScreen({ onStart, existingSession, onResume }: Pr
         (f as File & { _extractedText?: string })._extractedText = text;
       }
     } catch (err) {
-      setError(`Failed to read file: ${err instanceof Error ? err.message : String(err)}`);
+      setError(err instanceof Error ? err.message : 'Failed to read the file. Please try a different format.');
       setFile(null);
     } finally {
       setIsParsing(false);

@@ -43,14 +43,21 @@ export class GroqProvider implements AIProvider {
     });
 
     if (response.status === 401) {
-      throw createProviderError(this.name, 'Invalid API key. Get a free key at console.groq.com');
+      throw createProviderError(this.name, 'Invalid API key — open Settings and verify your Groq API key, or get a free one at console.groq.com');
     }
     if (response.status === 429) {
-      throw createProviderError(this.name, 'Rate limited. Wait a moment and try again.');
+      const body = await response.text().catch(() => '');
+      console.error('[Groq] 429 response body:', body);
+      const isTokenLimit = /token|daily|quota/i.test(body);
+      if (isTokenLimit) {
+        throw createProviderError(this.name, 'Daily token limit reached on your Groq plan. Try again tomorrow, or switch to a faster/smaller model in Settings.');
+      }
+      throw createProviderError(this.name, 'Groq rate limit hit — too many requests per minute. Wait 30 seconds and try again, or switch to a different model in Settings.');
     }
     if (!response.ok) {
       const text = await response.text();
-      throw createProviderError(this.name, `HTTP ${response.status}: ${text}`);
+      console.error(`[Groq] HTTP ${response.status} error:`, text);
+      throw createProviderError(this.name, `Groq API request failed (HTTP ${response.status}). Check your internet connection and try again.`);
     }
 
     const data = await response.json() as {
