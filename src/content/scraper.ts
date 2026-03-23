@@ -94,23 +94,38 @@ function findSectionContainer(anchorId: string): Element | null {
 // ─── Headline ─────────────────────────────────────────────────────────────────
 
 function scrapeHeadline(): string {
-  // Strategy 1: element with data-field attribute
+  // Strategy 1: data-field attribute (own profile edit view)
   const dataField = document.querySelector<HTMLElement>('[data-field="headline"]');
   if (dataField?.textContent?.trim()) {
     console.debug('[LI-Optimizer] headline via data-field:', dataField.textContent.trim().slice(0, 80));
     return dataField.textContent.trim();
   }
 
-  // Strategy 2: look inside the top card — the headline is the FIRST .text-body-medium.break-words
-  // that is NOT inside an h1 (the name element)
+  // Strategy 2: structural — find h1 (name), then get the first sibling element
+  // with meaningful text. This works on both own and other profiles regardless
+  // of class name changes.
+  const h1 = document.querySelector<HTMLElement>('main h1, h1.text-heading-xlarge, .scaffold-layout__main h1, h1');
+  if (h1) {
+    // Walk siblings after h1 within the same parent container
+    let sibling = h1.nextElementSibling as HTMLElement | null;
+    while (sibling) {
+      const t = sibling.textContent?.trim() ?? '';
+      // Skip: empty, connection/follower counts, very short (location line)
+      if (t.length > 10 && !t.match(/^\d+\s+(connection|follower)/i) && !sibling.querySelector('h1')) {
+        console.debug('[LI-Optimizer] headline via h1-sibling:', t.slice(0, 80));
+        return t;
+      }
+      sibling = sibling.nextElementSibling as HTMLElement | null;
+    }
+  }
+
+  // Strategy 3: top card class-based selectors
   const topCard = document.querySelector('.pv-text-details__left-panel, .ph5, .pv-top-card');
   if (topCard) {
     const name = topCard.querySelector('h1');
     for (const el of topCard.querySelectorAll<HTMLElement>('.text-body-medium.break-words, .text-body-medium')) {
       if (!name?.contains(el)) {
         const t = el.textContent?.trim() ?? '';
-        // Reject if it looks like a location (contains · or is very short) — no, headlines can have ·
-        // Reject if it looks like connections count
         if (t && !t.match(/^\d+\s+(connection|follower)/i)) {
           console.debug('[LI-Optimizer] headline via top-card .text-body-medium:', t.slice(0, 80));
           return t;
@@ -119,7 +134,7 @@ function scrapeHeadline(): string {
     }
   }
 
-  // Strategy 3: global selectors fallback
+  // Strategy 4: global selectors fallback
   const result = getText(SELECTORS.headline);
   console.debug('[LI-Optimizer] headline via global selector:', result.slice(0, 80));
   return result;
@@ -135,22 +150,49 @@ const ABOUT_NOISE = new Set([
 function scrapeAbout(): string {
   const candidates: string[] = [];
 
-  // Strategy 1: find the #about section container
-  const container = findSectionContainer('about');
-  if (container) {
-    const spans = getAriaSpans(container, 40);
-    const text = spans.filter((t) => !ABOUT_NOISE.has(t)).join(' ');
+  function extractFromContainer(container: Element): string {
+    // Collect all aria-hidden spans — use minLen=2 to avoid over-filtering
+    // sentence fragments that together form the about text
+    const spans = getAriaSpans(container, 2);
+    return spans.filter((t) => !ABOUT_NOISE.has(t)).join(' ').trim();
+  }
+
+  // Strategy 1: #about anchor (own profile, some other profiles)
+  const anchorContainer = findSectionContainer('about');
+  if (anchorContainer) {
+    const text = extractFromContainer(anchorContainer);
     if (text.length > 40) candidates.push(text);
   }
 
-  // Strategy 2: global selectors
-  for (const sel of SELECTORS.about) {
-    try {
-      for (const el of document.querySelectorAll<HTMLElement>(sel)) {
-        const t = el.textContent?.trim() ?? '';
-        if (t.length > 40 && !ABOUT_NOISE.has(t)) candidates.push(t);
-      }
-    } catch { /* bad selector */ }
+  // Strategy 2: heading-based lookup — most reliable for other profiles
+  // where #about anchor ID is absent
+  if (candidates.length === 0 || candidates[0].length < 80) {
+    const headingContainer = findSectionByHeading('About');
+    if (headingContainer && headingContainer !== anchorContainer) {
+      const text = extractFromContainer(headingContainer);
+      if (text.length > 40) candidates.push(text);
+    }
+  }
+
+  // Strategy 3: inline-show-more-text component anywhere on page
+  // (LinkedIn uses this for expandable about text in both own and other profiles)
+  if (candidates.length === 0) {
+    for (const el of document.querySelectorAll<HTMLElement>('.inline-show-more-text')) {
+      const t = el.textContent?.trim() ?? '';
+      if (t.length > 40 && !ABOUT_NOISE.has(t)) candidates.push(t);
+    }
+  }
+
+  // Strategy 4: global selectors fallback
+  if (candidates.length === 0) {
+    for (const sel of SELECTORS.about) {
+      try {
+        for (const el of document.querySelectorAll<HTMLElement>(sel)) {
+          const t = el.textContent?.trim() ?? '';
+          if (t.length > 40 && !ABOUT_NOISE.has(t)) candidates.push(t);
+        }
+      } catch { /* bad selector */ }
+    }
   }
 
   if (candidates.length === 0) {
@@ -475,7 +517,9 @@ function scrapeSkills(): string[] {
   return results;
 }
 
-// ─── Skills detail page scrape (/details/skills/) ────────────────────────────
+// ─── Detail page scrapers (/details/...) ──────────────────────────────────────
+// These pages have a simpler, more consistent DOM than the main profile page.
+// They work identically for your own profile and other people's profiles.
 
 export function scrapeSkillsDetailPage(): string[] {
   if (!window.location.href.includes('/details/skills/')) return [];
@@ -487,14 +531,159 @@ export function scrapeSkillsDetailPage(): string[] {
   return results;
 }
 
+export function scrapeExperienceDetailPage(): LinkedInExperience[] {
+  if (!window.location.href.includes('/details/experience/')) return [];
+  console.debug('[LI-Optimizer] scrapeExperienceDetailPage START');
+
+  const results: LinkedInExperience[] = [];
+
+  // On the detail page, experience items are top-level list items
+  const itemSelectors = [
+    'li.pvs-list__item--line-separated',
+    'li.artdeco-list__item',
+    'li.pvs-list__pv-entry',
+  ];
+
+  let items: Element[] = [];
+  for (const sel of itemSelectors) {
+    items = Array.from(document.querySelectorAll(sel));
+    if (items.length > 0) {
+      console.debug(`[LI-Optimizer] exp-detail: matched "${sel}" → ${items.length} items`);
+      break;
+    }
+  }
+
+  for (const item of items.slice(0, 10)) {
+    // Check for company group (multiple roles under one company)
+    const nestedItems = item.querySelectorAll('li.pvs-list__item--no-padding, li.pvs-list__item--no-padding-in-columns');
+    if (nestedItems.length > 1) {
+      const groupCompanyEl = item.querySelector<HTMLElement>('.t-bold span[aria-hidden="true"], .mr1 span[aria-hidden="true"]');
+      const groupCompany = groupCompanyEl?.textContent?.trim() ?? '';
+      for (const subItem of Array.from(nestedItems).slice(0, 5)) {
+        const exp = parseExpItem(subItem, results.length);
+        if (exp) {
+          if (exp.company === 'Unknown Company' && groupCompany) exp.company = groupCompany;
+          results.push(exp);
+        }
+        if (results.length >= 10) break;
+      }
+    } else {
+      const exp = parseExpItem(item, results.length);
+      if (exp) results.push(exp);
+    }
+    if (results.length >= 10) break;
+  }
+
+  console.debug('[LI-Optimizer] scrapeExperienceDetailPage found:', results.length);
+  return results;
+}
+
+// ─── Scroll to trigger lazy loading ──────────────────────────────────────────
+
+/**
+ * Scrolls to the top of the page, then scrolls down in steps to trigger
+ * LinkedIn's lazy-loaded sections, then returns to the top.
+ * Always starts from the top for a consistent reference point.
+ */
+async function scrollToLoadAllSections(): Promise<void> {
+  // Always start from top for a consistent reference point
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  await new Promise((r) => setTimeout(r, 300));
+
+  const viewportHeight = window.innerHeight;
+  const step = Math.floor(viewportHeight * 0.7);
+  console.debug('[LI-Optimizer] scrollToLoad: starting from top, step=', step);
+
+  // Scroll down in steps — re-check scrollHeight each iteration since
+  // lazy-loaded content extends the page as sections render
+  let pos = 0;
+  let prevHeight = 0;
+  for (let i = 0; i < 40; i++) {  // safety cap
+    pos += step;
+    window.scrollTo({ top: pos, behavior: 'auto' });
+    await new Promise((r) => setTimeout(r, 300));
+
+    const curHeight = document.documentElement.scrollHeight;
+    if (pos >= curHeight && curHeight === prevHeight) break;
+    prevHeight = curHeight;
+  }
+
+  // Final pause at the bottom to catch anything remaining
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
+  await new Promise((r) => setTimeout(r, 400));
+
+  // Click "see more" expand buttons to reveal truncated About text
+  const expandButtons = document.querySelectorAll<HTMLElement>(
+    'button.inline-show-more-text__button, ' +
+    'button[aria-label*="see more"], ' +
+    'button[aria-label*="Show more"]'
+  );
+  for (const btn of expandButtons) {
+    try { btn.click(); } catch { /* ignore */ }
+  }
+  if (expandButtons.length > 0) {
+    console.debug(`[LI-Optimizer] scrollToLoad: clicked ${expandButtons.length} "see more" buttons`);
+    await new Promise((r) => setTimeout(r, 300));
+  }
+
+  // Return to top so headline/about are in view when we scrape
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  await new Promise((r) => setTimeout(r, 200));
+  console.debug('[LI-Optimizer] scrollToLoad: done, back at top');
+}
+
+// ─── Top-card scrape (headline + about, no scrolling) ────────────────────────
+// Used when the profile page is opened as a background tab — we only need the
+// top-card data (name, headline, about). Skills and experience come from their
+// own detail pages. No scroll needed since these are always above the fold.
+
+export async function scrapeTopCard(): Promise<CurrentProfileData | null> {
+  if (!window.location.href.includes('linkedin.com/in/')) return null;
+
+  console.debug('[LI-Optimizer] scrapeTopCard START, url:', window.location.href);
+
+  // Click "see more" on the About section to get full untruncated text
+  const expandButtons = document.querySelectorAll<HTMLElement>(
+    'button.inline-show-more-text__button, button[aria-label*="see more"]'
+  );
+  for (const btn of expandButtons) {
+    try { btn.click(); } catch { /* ignore */ }
+  }
+  if (expandButtons.length > 0) {
+    await new Promise((r) => setTimeout(r, 400));
+  }
+
+  const profileUrl = window.location.href.split('?')[0];
+  const jsonLd = extractJsonLd();
+
+  const fullName = jsonLd?.name || getText(SELECTORS.fullName);
+  const headline = (jsonLd?.jobTitle?.trim() && jsonLd.jobTitle.length > 2)
+    ? jsonLd.jobTitle.trim()
+    : scrapeHeadline();
+  const jsonLdAbout = jsonLd?.description?.trim() ?? '';
+  const domAbout = scrapeAbout();
+  const about = domAbout.length > jsonLdAbout.length ? domAbout : jsonLdAbout;
+
+  console.debug('[LI-Optimizer] scrapeTopCard:', { fullName, headlineLen: headline.length, aboutLen: about.length });
+
+  return {
+    profileUrl, fullName, headline, about,
+    experience: [], education: [], skills: [], certifications: [],
+    scrapedAt: Date.now(),
+  };
+}
+
 // ─── Full profile scrape ─────────────────────────────────────────────────────
 
-export function scrapeFullProfile(): CurrentProfileData | null {
+export async function scrapeFullProfile(): Promise<CurrentProfileData | null> {
   if (!window.location.href.includes('linkedin.com/in/')) return null;
 
   console.debug('[LI-Optimizer] === scrapeFullProfile START ===');
   console.debug('[LI-Optimizer] URL:', window.location.href);
   console.debug('[LI-Optimizer] readyState:', document.readyState);
+
+  // Scroll through the page to trigger lazy-loaded sections
+  await scrollToLoadAllSections();
 
   const profileUrl = window.location.href.split('?')[0];
 
@@ -502,10 +691,17 @@ export function scrapeFullProfile(): CurrentProfileData | null {
   const jsonLd = extractJsonLd();
 
   const fullName = jsonLd?.name || getText(SELECTORS.fullName);
-  const headline = scrapeHeadline();
-  const about = jsonLd?.description?.trim() && jsonLd.description.length > 20
-    ? jsonLd.description
-    : scrapeAbout();
+
+  // JSON-LD jobTitle is the headline — use it if available, otherwise scrape DOM
+  const headline = (jsonLd?.jobTitle?.trim() && jsonLd.jobTitle.length > 2)
+    ? jsonLd.jobTitle.trim()
+    : scrapeHeadline();
+
+  // JSON-LD description is the about text — but it's often truncated to ~200 chars.
+  // Always run DOM scrape and use whichever is longer.
+  const jsonLdAbout = jsonLd?.description?.trim() ?? '';
+  const domAbout = scrapeAbout();
+  const about = domAbout.length > jsonLdAbout.length ? domAbout : jsonLdAbout;
 
   console.debug('[LI-Optimizer] name:', fullName);
   console.debug('[LI-Optimizer] headline:', headline.slice(0, 80));

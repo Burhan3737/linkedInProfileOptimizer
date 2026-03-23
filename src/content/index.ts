@@ -1,5 +1,5 @@
 import type { ChromeMessage, ChromeResponse } from '../shared/messaging';
-import { scrapeFullProfile, checkSelectorHealth, scrapeSkillsDetailPage } from './scraper';
+import { scrapeFullProfile, scrapeTopCard, checkSelectorHealth, scrapeSkillsDetailPage, scrapeExperienceDetailPage } from './scraper';
 import { safeApply, snapshotSection } from './injector';
 import type { OptimizationResult } from '../shared/types';
 import { saveUndoSnapshot } from '../shared/storage';
@@ -33,16 +33,19 @@ async function handleMessage(
   try {
     switch (message.action) {
       case 'SCRAPE_PROFILE': {
-        const health = checkSelectorHealth();
-        const profile = scrapeFullProfile();
+        // scrapeFullProfile scrolls to trigger lazy loading first, then scrapes
+        const profile = await scrapeFullProfile();
 
         if (!profile) {
           sendResponse({
             success: false,
-            error: 'Not on a LinkedIn profile page. Navigate to linkedin.com/in/your-profile',
+            error: 'Not on a LinkedIn profile page. Navigate to a profile at linkedin.com/in/...',
           });
           return;
         }
+
+        // Run health check after scrolling so sections are in the DOM
+        const health = checkSelectorHealth();
 
         chrome.runtime.sendMessage({
           action: 'PROFILE_SCRAPED',
@@ -53,9 +56,25 @@ async function handleMessage(
         break;
       }
 
+      case 'SCRAPE_TOP_CARD': {
+        const topCard = await scrapeTopCard();
+        if (!topCard) {
+          sendResponse({ success: false, error: 'Not on a LinkedIn profile page.' });
+          return;
+        }
+        sendResponse({ success: true, data: topCard });
+        break;
+      }
+
       case 'SCRAPE_SKILLS_DETAIL': {
         const skills = scrapeSkillsDetailPage();
         sendResponse({ success: true, data: skills });
+        break;
+      }
+
+      case 'SCRAPE_EXPERIENCE_DETAIL': {
+        const experience = scrapeExperienceDetailPage();
+        sendResponse({ success: true, data: experience });
         break;
       }
 

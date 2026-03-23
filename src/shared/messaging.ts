@@ -32,7 +32,9 @@ export type MessageAction =
   | 'CONTENT_READY'
   // Service worker → Content script
   | 'SCRAPE_PROFILE'
+  | 'SCRAPE_TOP_CARD'
   | 'SCRAPE_SKILLS_DETAIL'
+  | 'SCRAPE_EXPERIENCE_DETAIL'
   | 'APPLY_DOM_CHANGE';
 
 // ─── Message Payloads ─────────────────────────────────────────────────────────

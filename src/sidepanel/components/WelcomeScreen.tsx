@@ -92,11 +92,11 @@ export default function WelcomeScreen({ onStart, existingSession, onResume }: Pr
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const url = tab?.url ?? '';
       if (!url.match(/linkedin\.com\/in\//)) {
-        setError('Please navigate to your LinkedIn profile page (linkedin.com/in/…) before analyzing.');
+        setError('Please navigate to a LinkedIn profile page (linkedin.com/in/…) before analyzing.');
         return;
       }
     } catch {
-      setError('Could not verify the current tab. Please ensure you are on your LinkedIn profile page.');
+      setError('Could not verify the current tab. Please ensure you are on a LinkedIn profile page.');
       return;
     }
 
@@ -349,7 +349,7 @@ export default function WelcomeScreen({ onStart, existingSession, onResume }: Pr
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
-          <span>Navigate to your <strong>LinkedIn profile page</strong> (linkedin.com/in/...) before clicking Analyze.</span>
+          <span>Navigate to a <strong>LinkedIn profile page</strong> (linkedin.com/in/...) before clicking Analyze. You can analyze your own or someone else's profile.</span>
         </div>
       </div>
 
@@ -365,7 +365,7 @@ export default function WelcomeScreen({ onStart, existingSession, onResume }: Pr
             Reading file...
           </>
         ) : (
-          'Analyze My Profile'
+          'Analyze Profile'
         )}
       </button>
     </form>

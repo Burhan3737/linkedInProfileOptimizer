@@ -60,13 +60,13 @@ Chrome MV3 extension that compares a user's resume against their LinkedIn profil
 | `index.ts` | `createProvider(settings)` factory — currently always returns GroqProvider |
 
 ### src/background/ — Service Worker
-- `service-worker.ts` (~405 lines) — Central orchestrator. Handles all 16 message actions. Pipeline steps: parse resume → scrape profile (with retry + programmatic content script re-injection) → gap analysis → optimize sections. Broadcasts `SESSION_UPDATE` and `PIPELINE_STEP_UPDATE` to side panel. Implements 24h profile caching.
+- `service-worker.ts` — Central orchestrator. Handles all 18 message actions. Pipeline steps: parse resume → scrape profile (on-page + detail pages for experience/skills/about in parallel) → gap analysis → optimize sections. Broadcasts `SESSION_UPDATE` and `PIPELINE_STEP_UPDATE` to side panel. Implements 24h profile caching. Detail page scraping opens background tabs at `/details/experience/`, `/details/skills/`, `/details/about/` for reliable data extraction on both own and other profiles.
 
 ### src/content/ — Content Script (runs on linkedin.com)
 | File | Purpose |
 |------|---------|
-| `index.ts` | Entry point, message listener, SPA navigation observer |
-| `scraper.ts` | `scrapeFullProfile()` — JSON-LD primary, DOM fallback. Extracts headline, about, experience, education, skills, certifications. `checkSelectorHealth()` for diagnostics |
+| `index.ts` | Entry point, message listener (handles SCRAPE_PROFILE, SCRAPE_SKILLS_DETAIL, SCRAPE_EXPERIENCE_DETAIL, SCRAPE_ABOUT_DETAIL, APPLY_DOM_CHANGE), SPA navigation observer |
+| `scraper.ts` | `scrapeFullProfile()` (async) — scrolls page to trigger lazy loading, clicks "see more" buttons, then scrapes via JSON-LD + DOM. Detail page scrapers: `scrapeExperienceDetailPage()`, `scrapeSkillsDetailPage()`, `scrapeAboutDetailPage()`. Works on both own and other people's profiles |
 | `injector.ts` | Legacy file — previously used for DOM injection. The UI now uses copy-to-clipboard instead; users paste changes into LinkedIn manually. Retained for potential future use |
 | `selectors.ts` | All DOM selectors as arrays of fallbacks. `querySelector()` and `querySelectorAll()` try each in order |
 

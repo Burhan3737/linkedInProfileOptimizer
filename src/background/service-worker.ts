@@ -59,7 +59,7 @@ async function handleMessage(
         const { result } = message.payload as { result: OptimizationResult };
         const tab = await getActiveLinkedInTab();
         if (!tab?.id) {
-          sendResponse({ success: false, error: 'No active LinkedIn tab found. Please navigate to your LinkedIn profile.' });
+          sendResponse({ success: false, error: 'No active LinkedIn tab found. Please navigate to a LinkedIn profile page.' });
           return;
         }
         try {
@@ -252,7 +252,7 @@ async function runPipeline(payload: StartOptimizationPayload): Promise<void> {
     const tab = await getActiveLinkedInTab();
     if (!tab?.id) {
       throw new Error(
-        'No LinkedIn tab found. Make sure your LinkedIn profile page (linkedin.com/in/...) is open in Chrome, then try again.'
+        'No LinkedIn tab found. Make sure a LinkedIn profile page (linkedin.com/in/...) is open in Chrome, then try again.'
       );
     }
 
@@ -260,51 +260,45 @@ async function runPipeline(payload: StartOptimizationPayload): Promise<void> {
     if (!tab.url?.includes('/in/')) {
       throw new Error(
         `Found a LinkedIn tab (${shortUrl}) but it's not a profile page. ` +
-        'Please navigate to your own profile (linkedin.com/in/YOUR-USERNAME) and try again.'
+        'Please navigate to a LinkedIn profile page (linkedin.com/in/...) and try again.'
       );
     }
 
-    sendStep('scrape', 'Scrape LinkedIn profile', 'running', `Reading ${shortUrl}...`);
+    // Capture profile URL immediately — the active tab may navigate away to a feed
+    // URL during scraping, so we grab it here and use background tabs for everything.
+    const profileUrl = tab.url.split('?')[0].replace(/\/$/, '');
+    sendStep('scrape', 'Scrape LinkedIn profile', 'running', `Found: ${shortUrl}`);
 
-    // Retry scrape up to 3 times — content script may not be ready on first load
-    const scrapeRes = await retryContentScript<import('../shared/types').CurrentProfileData>(
-      tab.id,
-      { action: 'SCRAPE_PROFILE' },
-      3,
-      1500,
-      (attempt) => sendStep('scrape', 'Scrape LinkedIn profile', 'running', `Attempt ${attempt}/3 — waiting for content script...`)
-    );
+    // Step 2a: Open background tab for main profile page → headline + about + fullName
+    sendStep('scrape', 'Scrape LinkedIn profile', 'running', 'Loading profile page (headline & about)...');
+    const topCardData = await fetchTopCardData(profileUrl);
+    if (!topCardData) {
+      throw new Error('Failed to load profile page. Try reloading the LinkedIn profile tab and running again.');
+    }
+    let profileData = topCardData;
+    broadcast({ profileData }); // show headline/about in UI immediately
 
-    if (!scrapeRes.success || !scrapeRes.data) {
-      throw new Error(
-        (scrapeRes.error ?? 'Failed to scrape LinkedIn profile') +
-        '\n\nTry reloading the LinkedIn profile tab and running again.'
-      );
+    // Step 2b: Skills detail page
+    sendStep('scrape', 'Scrape LinkedIn profile', 'running', 'Loading skills page...');
+    const detailSkills = await fetchSkillsFromDetailPage(profileUrl);
+    if (detailSkills.length > 0) {
+      profileData = { ...profileData, skills: detailSkills };
+      console.debug(`[SW] Skills from detail page: ${detailSkills.length}`);
     }
 
-    let profileData = scrapeRes.data;
-    await saveCachedProfile(profileData); // cache for next run
+    // Step 2c: Experience detail page
+    sendStep('scrape', 'Scrape LinkedIn profile', 'running', 'Loading experience page...');
+    const detailExperience = await fetchExperienceFromDetailPage(profileUrl);
+    if (detailExperience.length > 0) {
+      profileData = { ...profileData, experience: detailExperience };
+      console.debug(`[SW] Experience from detail page: ${detailExperience.length}`);
+    }
+
+    await saveCachedProfile(profileData);
 
     const expCount = profileData.experience.length;
     sendStep('scrape', 'Scrape LinkedIn profile', 'done',
-      `${expCount} experience${expCount !== 1 ? 's' : ''}, ${profileData.skills.length} skills on profile`);
-    broadcast({ profileData }); // broadcast immediately so UI shows headline/about
-
-    // Step 2b: augment skills from detail page (non-blocking for headline/about)
-    const detailSkills = await fetchSkillsFromDetailPage(profileData.profileUrl);
-    if (detailSkills.length > 0) {
-      const seen = new Set(profileData.skills.map(s => s.toLowerCase()));
-      const merged = [...profileData.skills];
-      for (const skill of detailSkills) {
-        if (!seen.has(skill.toLowerCase())) {
-          seen.add(skill.toLowerCase());
-          merged.push(skill);
-        }
-      }
-      profileData = { ...profileData, skills: merged };
-      await saveCachedProfile(profileData); // update cache with full skills
-      console.debug(`[SW] Skills merged: ${merged.length} total`);
-    }
+      `${expCount} experience${expCount !== 1 ? 's' : ''}, ${profileData.skills.length} skills`);
 
     // ── Step 3: Gap Analysis ─────────────────────────────────────────────
     broadcast({ status: 'analyzing' });
@@ -407,26 +401,44 @@ function waitForTabLoad(tabId: number, timeoutMs = 15000): Promise<void> {
   });
 }
 
-/** Opens skills detail page in background tab, scrapes all skills, closes tab. */
-async function fetchSkillsFromDetailPage(profileUrl: string): Promise<string[]> {
+/** Opens a detail page in a background tab, runs a scrape action, closes the tab. */
+async function fetchFromDetailPage<T>(
+  profileUrl: string,
+  detailPath: string,
+  action: import('../shared/messaging').MessageAction,
+  label: string
+): Promise<T | null> {
   const base = profileUrl.endsWith('/') ? profileUrl : profileUrl + '/';
-  const skillsUrl = base + 'details/skills/';
+  const detailUrl = base + detailPath;
   let tabId: number | undefined;
   try {
-    const tab = await chrome.tabs.create({ url: skillsUrl, active: false });
+    const tab = await chrome.tabs.create({ url: detailUrl, active: false });
     tabId = tab.id!;
-    console.debug('[SW] Skills detail tab:', tabId, skillsUrl);
+    console.debug(`[SW] ${label} detail tab:`, tabId, detailUrl);
     await waitForTabLoad(tabId);
-    const res = await retryContentScript<string[]>(tabId, { action: 'SCRAPE_SKILLS_DETAIL' }, 3, 1000);
-    if (!res.success || !res.data) return [];
-    console.debug('[SW] Skills detail scraped:', res.data.length);
+    const res = await retryContentScript<T>(tabId, { action }, 3, 1000);
+    if (!res.success || !res.data) return null;
+    console.debug(`[SW] ${label} detail scraped:`, Array.isArray(res.data) ? res.data.length : 'ok');
     return res.data;
   } catch (err) {
-    console.warn('[SW] fetchSkillsFromDetailPage failed:', err instanceof Error ? err.message : err);
-    return [];
+    console.warn(`[SW] fetch${label}FromDetailPage failed:`, err instanceof Error ? err.message : err);
+    return null;
   } finally {
     if (tabId !== undefined) chrome.tabs.remove(tabId).catch(() => {});
   }
+}
+
+/** Opens the main profile page in a background tab, scrapes headline + about + fullName, closes tab. */
+async function fetchTopCardData(profileUrl: string): Promise<import('../shared/types').CurrentProfileData | null> {
+  return await fetchFromDetailPage<import('../shared/types').CurrentProfileData>(profileUrl, '', 'SCRAPE_TOP_CARD', 'TopCard');
+}
+
+async function fetchSkillsFromDetailPage(profileUrl: string): Promise<string[]> {
+  return (await fetchFromDetailPage<string[]>(profileUrl, 'details/skills/', 'SCRAPE_SKILLS_DETAIL', 'Skills')) ?? [];
+}
+
+async function fetchExperienceFromDetailPage(profileUrl: string): Promise<import('../shared/types').LinkedInExperience[]> {
+  return (await fetchFromDetailPage<import('../shared/types').LinkedInExperience[]>(profileUrl, 'details/experience/', 'SCRAPE_EXPERIENCE_DETAIL', 'Experience')) ?? [];
 }
 
 async function retryContentScript<T>(
