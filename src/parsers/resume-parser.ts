@@ -6,9 +6,9 @@ import { z } from 'zod';
 
 // nullish() = optional() + nullable() — handles both undefined and null from AI
 const WorkExperienceSchema = z.object({
-  company: z.string(),
+  company: z.string().nullish().transform(v => v ?? ''),
   title: z.string(),
-  startDate: z.string(),
+  startDate: z.string().nullish().transform(v => v ?? ''),
   endDate: z.string().nullish().transform(v => v ?? null),
   description: z.string().nullish().transform(v => v ?? ''),
   bullets: z.array(z.string()).nullish().transform(v => v ?? []),
@@ -16,11 +16,11 @@ const WorkExperienceSchema = z.object({
 });
 
 const EducationSchema = z.object({
-  institution: z.string(),
+  institution: z.string().nullish().transform(v => v ?? ''),
   degree: z.string(),
   field: z.string(),
-  startDate: z.string(),
-  endDate: z.string(),
+  startDate: z.string().nullish().transform(v => v ?? ''),
+  endDate: z.string().nullish().transform(v => v ?? ''),
   gpa: z.string().nullish().transform(v => v ?? undefined),
   activities: z.string().nullish().transform(v => v ?? undefined),
 });
